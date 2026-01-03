@@ -4,7 +4,11 @@ import { fetchReports } from '../services/api';
 import ReportCard from './ReportCard';
 import './Reports.css';
 
-const Reports: React.FC = () => {
+interface ReportsProps {
+  onViewMarket?: (marketId: string) => void;
+}
+
+const Reports: React.FC<ReportsProps> = ({ onViewMarket }) => {
   const [reports, setReports] = useState<NewsReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +67,11 @@ const Reports: React.FC = () => {
           </div>
         ) : (
           reports.map(report => (
-            <ReportCard key={report.id} report={report} />
+            <ReportCard 
+              key={report.id} 
+              report={report} 
+              onViewMarket={onViewMarket}
+            />
           ))
         )}
       </div>

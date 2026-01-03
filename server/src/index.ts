@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { initDatabase, saveNewsReport } from './database';
+import { initDatabase, saveNewsReport, getRecentReportsByMarket } from './database';
 import { updateAllMarkets } from './services/polymarket';
 import { detectAnomalies, shouldGenerateReport, filterNoisiestMarkets } from './services/anomalyDetection';
 import { generateReport, initializeAI } from './services/aiReport';
@@ -63,12 +63,49 @@ async function updateMarketsAndGenerateReports() {
     for (const scoredMarket of noisiestMarkets) {
       try {
         const { market, anomalies, score, reasons } = scoredMarket;
+        
+        // Check for duplicate reports (within last 24 hours)
+        const recentReports = await getRecentReportsByMarket(market.marketId, 24);
+        
+        if (recentReports.length > 0) {
+          // Check if this is an unprecedented change (score is significantly higher)
+          // Calculate previous max score from recent reports
+          const previousMaxScore = Math.max(...recentReports.map(r => {
+            // Estimate score from price/volume changes
+            const priceMag = Math.abs(r.priceChange || 0) * 100;
+            const volumeMag = Math.abs(r.volumeChange || 0) * 5;
+            return priceMag + volumeMag;
+          }));
+          
+          // Only create new report if score is 50% higher than previous (unprecedented change)
+          if (score <= previousMaxScore * 1.5) {
+            console.log(`⏭️  Skipping duplicate report for ${market.question.substring(0, 50)}...`);
+            console.log(`   Current score: ${score.toFixed(1)}, Previous max: ${previousMaxScore.toFixed(1)}`);
+            continue;
+          } else {
+            console.log(`🆕 Unprecedented change detected for ${market.question.substring(0, 50)}...`);
+            console.log(`   Current score: ${score.toFixed(1)}, Previous max: ${previousMaxScore.toFixed(1)}`);
+          }
+        }
+        
         console.log(`\n📰 Generating report for: ${market.question.substring(0, 50)}...`);
         console.log(`   Noise score: ${score.toFixed(1)}, Reasons: ${reasons.join(', ')}`);
         
-        const report = await generateReport(market, anomalies);
+        const report = await generateReport(market, anomalies, reasons);
         
         const primaryAnomaly = anomalies.find(a => a.severity === 'high') || anomalies[0];
+        
+        // Calculate actual price change (1h if available, otherwise 24h)
+        const actualPriceChange = market.previousPrice1h !== null
+          ? (market.currentPrice - market.previousPrice1h) / market.previousPrice1h
+          : market.previousPrice24h !== null
+          ? (market.currentPrice - market.previousPrice24h) / market.previousPrice24h
+          : primaryAnomaly.priceChange;
+        
+        // Calculate actual volume change (vs average)
+        const actualVolumeChange = market.volumeAverage > 0
+          ? (market.volume24h - market.volumeAverage) / market.volumeAverage
+          : primaryAnomaly.volumeChange;
         
         await saveNewsReport({
           marketId: market.marketId,
@@ -77,8 +114,9 @@ async function updateMarketsAndGenerateReports() {
           analysis: report.analysis,
           keyTakeaways: report.keyTakeaways,
           confidence: primaryAnomaly.confidence,
-          priceChange: primaryAnomaly.priceChange,
-          volumeChange: primaryAnomaly.volumeChange,
+          priceChange: actualPriceChange,
+          volumeChange: actualVolumeChange,
+          reasons: report.reasons || reasons,
           timestamp: Date.now()
         });
         

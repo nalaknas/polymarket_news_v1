@@ -50,24 +50,55 @@ export interface PolymarketTicker {
   liquidity?: string;
 }
 
-// Map Polymarket categories/tags to our categories
-function mapCategory(tags: string[] = []): string {
+// Map Polymarket categories/tags and question text to our categories
+function mapCategory(tags: string[] = [], question: string = ''): string {
   const tagStr = tags.join(' ').toLowerCase();
+  const questionLower = question.toLowerCase();
+  const combinedText = `${tagStr} ${questionLower}`;
   
-  if (tagStr.includes('politics') || tagStr.includes('election') || tagStr.includes('president')) {
+  // Politics & Elections
+  if (combinedText.match(/\b(politics|political|election|president|senate|congress|congressional|governor|mayor|trump|biden|democrat|republican|vote|voting|ballot|campaign|primary|caucus|impeachment|supreme court|scotus)\b/)) {
     return 'Politics';
   }
-  if (tagStr.includes('economics') || tagStr.includes('economy') || tagStr.includes('inflation') || tagStr.includes('gdp')) {
+  
+  // Economics & Finance
+  if (combinedText.match(/\b(economics|economy|economic|inflation|gdp|recession|unemployment|fed|federal reserve|interest rate|stock market|dow|s&p|nasdaq|bitcoin|btc|ethereum|eth|crypto|cryptocurrency|defi|nft|dollar|currency|yuan|euro|trading|market cap)\b/)) {
     return 'Economics';
   }
-  if (tagStr.includes('technology') || tagStr.includes('tech') || tagStr.includes('ai') || tagStr.includes('crypto')) {
+  
+  // Technology
+  if (combinedText.match(/\b(technology|tech|ai|artificial intelligence|machine learning|ml|llm|gpt|chatgpt|openai|anthropic|claude|google|apple|microsoft|meta|facebook|twitter|x|tesla|spacex|neuralink|quantum|blockchain|web3|software|hardware|chip|semiconductor|nvidia|amd|intel)\b/)) {
     return 'Technology';
   }
-  if (tagStr.includes('sports') || tagStr.includes('football') || tagStr.includes('basketball') || tagStr.includes('baseball')) {
+  
+  // Sports
+  if (combinedText.match(/\b(sports|sport|football|nfl|nba|mlb|nhl|soccer|basketball|baseball|hockey|tennis|golf|olympics|super bowl|world cup|championship|playoff|playoff|mvp|heisman|draft|trade|player|team|coach)\b/)) {
     return 'Sports';
   }
-  if (tagStr.includes('world') || tagStr.includes('international') || tagStr.includes('war') || tagStr.includes('conflict')) {
+  
+  // World Events & Geopolitics
+  if (combinedText.match(/\b(world|international|war|conflict|russia|ukraine|china|iran|israel|palestine|middle east|nato|un|united nations|sanctions|embargo|trade war|military|defense|nuclear|missile|attack|invasion|peace|treaty|summit|g7|g20)\b/)) {
     return 'World Events';
+  }
+  
+  // Entertainment & Media
+  if (combinedText.match(/\b(entertainment|movie|film|oscar|emmy|grammy|award|netflix|disney|hbo|streaming|music|album|song|artist|actor|actress|director|celebrity|hollywood|box office)\b/)) {
+    return 'Entertainment';
+  }
+  
+  // Health & Science
+  if (combinedText.match(/\b(health|medical|medicine|disease|virus|pandemic|epidemic|covid|vaccine|fda|clinical trial|drug|pharmaceutical|biotech|research|study|scientific|nasa|space|mars|moon|climate|global warming|environment|green|renewable|energy)\b/)) {
+    return 'Health & Science';
+  }
+  
+  // Business & Companies
+  if (combinedText.match(/\b(business|company|corporate|merger|acquisition|ipo|bankruptcy|layoff|hiring|ceo|executive|startup|unicorn|venture capital|vc|ipo|earnings|revenue|profit|loss|quarterly|annual report)\b/)) {
+    return 'Business';
+  }
+  
+  // Legal & Crime
+  if (combinedText.match(/\b(legal|law|court|lawsuit|trial|verdict|judge|jury|attorney|lawyer|crime|criminal|arrest|charges|indictment|conviction|prison|jail|sentencing)\b/)) {
+    return 'Legal';
   }
   
   return 'Other';
@@ -624,7 +655,7 @@ export async function updateMarketData(market: PolymarketMarket): Promise<Market
     const marketData: MarketData = {
       marketId: market.id,
       question: market.question,
-      category: mapCategory(tags),
+      category: mapCategory(tags, market.question),
       currentPrice,
       previousPrice1h: price1hAgo,
       previousPrice24h: price24hAgo,

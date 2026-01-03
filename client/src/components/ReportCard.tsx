@@ -5,9 +5,10 @@ import './ReportCard.css';
 
 interface ReportCardProps {
   report: NewsReport;
+  onViewMarket?: (marketId: string) => void;
 }
 
-const ReportCard: React.FC<ReportCardProps> = ({ report }) => {
+const ReportCard: React.FC<ReportCardProps> = ({ report, onViewMarket }) => {
   const [expanded, setExpanded] = useState(false);
 
   const getConfidenceColor = (confidence: number) => {
@@ -71,13 +72,24 @@ const ReportCard: React.FC<ReportCardProps> = ({ report }) => {
             </ul>
           </div>
 
+          {report.reasons && report.reasons.length > 0 && (
+            <div className="report-reasons">
+              <h3>Why This Is Significant</h3>
+              <ul>
+                {report.reasons.map((reason, idx) => (
+                  <li key={idx}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="report-metrics">
             <div className="metric">
               <span className="metric-label">Price Change</span>
               <span
                 className="metric-value"
                 style={{
-                  color: report.priceChange > 0 ? '#22c55e' : '#ef4444'
+                  color: report.priceChange > 0 ? '#22c55e' : report.priceChange < 0 ? '#ef4444' : '#666'
                 }}
               >
                 {report.priceChange > 0 ? '+' : ''}
@@ -89,14 +101,27 @@ const ReportCard: React.FC<ReportCardProps> = ({ report }) => {
               <span
                 className="metric-value"
                 style={{
-                  color: report.volumeChange > 0 ? '#22c55e' : '#ef4444'
+                  color: report.volumeChange > 0 ? '#22c55e' : report.volumeChange < 0 ? '#ef4444' : '#666'
                 }}
               >
                 {report.volumeChange > 0 ? '+' : ''}
-                {(report.volumeChange * 100).toFixed(1)}%
+                {report.volumeChange >= 1 
+                  ? `${(report.volumeChange * 100).toFixed(0)}%` 
+                  : `${(report.volumeChange * 100).toFixed(1)}%`}
               </span>
             </div>
           </div>
+
+          {onViewMarket && (
+            <div className="report-market-link">
+              <button
+                className="view-market-button"
+                onClick={() => onViewMarket(report.marketId)}
+              >
+                📊 View Related Market
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -18,9 +18,10 @@ export interface GeneratedReport {
   summary: string;
   analysis: string;
   keyTakeaways: string;
+  reasons?: string[]; // Reasons why this news is significant
 }
 
-async function generateWithClaude(market: MarketData, anomalies: Anomaly[]): Promise<GeneratedReport> {
+async function generateWithClaude(market: MarketData, anomalies: Anomaly[], reasons: string[] = []): Promise<GeneratedReport> {
   if (!anthropic) {
     throw new Error('Anthropic client not initialized');
   }
@@ -78,7 +79,9 @@ Keep the tone neutral, factual, and accessible to non-traders. Focus on "markets
     
     const content = message.content[0];
     if (content.type === 'text') {
-      return parseReport(content.text);
+      const report = parseReport(content.text);
+      report.reasons = reasons; // Include reasons in the returned report
+      return report;
     }
     
     throw new Error('Unexpected response format from Claude');
@@ -88,7 +91,7 @@ Keep the tone neutral, factual, and accessible to non-traders. Focus on "markets
   }
 }
 
-async function generateWithOpenAI(market: MarketData, anomalies: Anomaly[]): Promise<GeneratedReport> {
+async function generateWithOpenAI(market: MarketData, anomalies: Anomaly[], reasons: string[] = []): Promise<GeneratedReport> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OpenAI API key not set');
@@ -107,6 +110,7 @@ async function generateWithOpenAI(market: MarketData, anomalies: Anomaly[]): Pro
     : 'N/A';
   
   const anomalyDescriptions = anomalies.map(a => `- ${a.type}: ${a.description} (${a.severity} severity)`).join('\n');
+  const reasonsText = reasons.length > 0 ? `\n\nWhy This Is Significant:\n${reasons.map(r => `- ${r}`).join('\n')}` : '';
   
   const prompt = `A prediction market on Polymarket is showing unusual activity. Generate a neutral news report explaining this to a general audience:
 
@@ -121,17 +125,20 @@ Volume (24h): $${market.volume24h.toLocaleString()}
 Volume Spike: ${volumeSpike}%
 
 Detected Anomalies:
-${anomalyDescriptions}
+${anomalyDescriptions}${reasonsText}
 
 Write a news report with the following structure:
 1. HEADLINE: A clear, factual headline (max 80 characters)
-2. SUMMARY: A 2-3 sentence summary paragraph explaining what happened
+2. SUMMARY: A 2-3 sentence summary paragraph explaining what happened and WHY it's significant. Specifically mention the key reasons from the "Why This Is Significant" section above.
 3. ANALYSIS: A detailed 3-4 paragraph analysis that:
    - Explains what the market is about in plain language
    - Describes the price movement and what it likely signals
-   - Provides context on why this matters
+   - EXPLICITLY explains why this news is significant to the user, referencing the specific reasons (price spikes, volume spikes, combined signals, etc.)
+   - Provides context on why this matters and what it might indicate
    - Notes any limitations or caveats
-4. KEY_TAKEAWAYS: 3-4 bullet points highlighting the most important information
+4. KEY_TAKEAWAYS: 3-4 bullet points highlighting the most important information, including WHY this matters
+
+IMPORTANT: Make sure to incorporate the specific reasons for significance (like "Price spike: X%", "Volume spike: Y%", "COMBINED: Price + Volume spike", etc.) directly into your analysis. Don't just mention that there was movement - explain WHY the specific magnitude and combination of signals makes this noteworthy.
 
 Keep the tone neutral, factual, and accessible to non-traders. Focus on "markets are pricing in" language rather than making predictions. Avoid speculation and sensationalism.`;
 
@@ -153,7 +160,9 @@ Keep the tone neutral, factual, and accessible to non-traders. Focus on "markets
     );
     
     const content = response.data.choices[0].message.content;
-    return parseReport(content);
+    const report = parseReport(content);
+    report.reasons = reasons; // Include reasons in the returned report
+    return report;
   } catch (error) {
     console.error('Error generating report with OpenAI:', error);
     throw error;
@@ -174,11 +183,11 @@ function parseReport(text: string): GeneratedReport {
   };
 }
 
-export async function generateReport(market: MarketData, anomalies: Anomaly[]): Promise<GeneratedReport> {
+export async function generateReport(market: MarketData, anomalies: Anomaly[], reasons: string[] = []): Promise<GeneratedReport> {
   if (useOpenAI) {
-    return generateWithOpenAI(market, anomalies);
+    return generateWithOpenAI(market, anomalies, reasons);
   } else {
-    return generateWithClaude(market, anomalies);
+    return generateWithClaude(market, anomalies, reasons);
   }
 }
 

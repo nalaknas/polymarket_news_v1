@@ -6,6 +6,14 @@ import Header from './components/Header';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'markets' | 'reports'>('markets');
+  const [highlightMarketId, setHighlightMarketId] = useState<string | null>(null);
+
+  const handleViewMarket = (marketId: string) => {
+    setActiveTab('markets');
+    setHighlightMarketId(marketId);
+    // Clear highlight after a delay
+    setTimeout(() => setHighlightMarketId(null), 3000);
+  };
 
   return (
     <div className="App">
@@ -25,7 +33,11 @@ function App() {
         </button>
       </div>
       <main className="main-content">
-        {activeTab === 'markets' ? <Dashboard /> : <Reports />}
+        {activeTab === 'markets' ? (
+          <Dashboard highlightMarketId={highlightMarketId} />
+        ) : (
+          <Reports onViewMarket={handleViewMarket} />
+        )}
       </main>
     </div>
   );

@@ -34,6 +34,7 @@ export interface NewsReport {
   confidence: number;
   priceChange: number;
   volumeChange: number;
+  reasons?: string[]; // Reasons why this news is significant
   timestamp: number;
   createdAt: number;
 }

@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MarketData } from '../types';
 import { fetchMarkets } from '../services/api';
 import MarketCard from './MarketCard';
 import Filters from './Filters';
 import './Dashboard.css';
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  highlightMarketId?: string | null;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ highlightMarketId }) => {
   const [markets, setMarkets] = useState<MarketData[]>([]);
   const [filteredMarkets, setFilteredMarkets] = useState<MarketData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +19,7 @@ const Dashboard: React.FC = () => {
     sortBy: 'recency' as 'recency' | 'magnitude' | 'volume',
     showAnomaliesOnly: false
   });
+  const marketRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
     loadMarkets();
@@ -25,6 +30,25 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     applyFilters();
   }, [markets, filters]);
+
+  useEffect(() => {
+    if (highlightMarketId && marketRefs.current[highlightMarketId]) {
+      // Ensure the market is visible in filtered results
+      const market = markets.find(m => m.marketId === highlightMarketId);
+      if (market && !filteredMarkets.some(m => m.marketId === highlightMarketId)) {
+        // Market is filtered out, temporarily show it
+        setFilters({ ...filters, category: 'all', showAnomaliesOnly: false });
+      }
+      
+      // Scroll to the market
+      setTimeout(() => {
+        marketRefs.current[highlightMarketId]?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+    }
+  }, [highlightMarketId, filteredMarkets, markets, filters]);
 
   const loadMarkets = async () => {
     try {
@@ -110,7 +134,17 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           filteredMarkets.map(market => (
-            <MarketCard key={market.marketId} market={market} />
+            <div
+              key={market.marketId}
+              ref={el => marketRefs.current[market.marketId] = el}
+              style={{
+                outline: highlightMarketId === market.marketId ? '3px solid #3b82f6' : 'none',
+                borderRadius: highlightMarketId === market.marketId ? '8px' : '0',
+                transition: 'outline 0.3s ease'
+              }}
+            >
+              <MarketCard market={market} />
+            </div>
           ))
         )}
       </div>

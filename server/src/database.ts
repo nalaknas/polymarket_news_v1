@@ -61,6 +61,7 @@ export interface NewsReport {
   confidence: number;
   priceChange: number;
   volumeChange: number;
+  reasons?: string; // JSON string array of reasons why this news is significant
   timestamp: number;
   createdAt: number;
 }
@@ -110,11 +111,22 @@ export async function initDatabase() {
       confidence REAL,
       priceChange REAL,
       volumeChange REAL,
+      reasons TEXT,
       timestamp INTEGER NOT NULL,
       createdAt INTEGER DEFAULT (strftime('%s', 'now')),
       FOREIGN KEY (marketId) REFERENCES markets(marketId)
     )
   `);
+  
+  // Add reasons column if it doesn't exist (for existing databases)
+  try {
+    await dbRun(`ALTER TABLE news_reports ADD COLUMN reasons TEXT`);
+  } catch (error: any) {
+    // Column already exists, ignore error
+    if (!error.message.includes('duplicate column')) {
+      console.warn('Could not add reasons column:', error.message);
+    }
+  }
 
   await dbRun(`
     CREATE INDEX IF NOT EXISTS idx_reports_timestamp 
@@ -205,11 +217,12 @@ export async function getMarketHistory(marketId: string, hours: number = 24): Pr
 }
 
 export async function saveNewsReport(report: NewsReport): Promise<number> {
+  const reasonsJson = report.reasons ? JSON.stringify(report.reasons) : null;
   const result = await dbRun(`
     INSERT INTO news_reports 
     (marketId, headline, summary, analysis, keyTakeaways, confidence, 
-     priceChange, volumeChange, timestamp, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+     priceChange, volumeChange, reasons, timestamp, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
   `, [
     report.marketId,
     report.headline,
@@ -219,6 +232,7 @@ export async function saveNewsReport(report: NewsReport): Promise<number> {
     report.confidence,
     report.priceChange,
     report.volumeChange,
+    reasonsJson,
     report.timestamp
   ]) as any;
   
@@ -242,6 +256,31 @@ export async function getRecentReports(limit: number = 50): Promise<NewsReport[]
     confidence: row.confidence,
     priceChange: row.priceChange,
     volumeChange: row.volumeChange,
+    reasons: row.reasons ? JSON.parse(row.reasons) : undefined,
+    timestamp: row.timestamp,
+    createdAt: row.createdAt
+  }));
+}
+
+export async function getRecentReportsByMarket(marketId: string, hours: number = 24): Promise<NewsReport[]> {
+  const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+  const rows = await dbAll(`
+    SELECT * FROM news_reports 
+    WHERE marketId = ? AND timestamp > ?
+    ORDER BY timestamp DESC
+  `, [marketId, cutoff]) as any[];
+  
+  return rows.map(row => ({
+    id: row.id,
+    marketId: row.marketId,
+    headline: row.headline,
+    summary: row.summary,
+    analysis: row.analysis,
+    keyTakeaways: row.keyTakeaways,
+    confidence: row.confidence,
+    priceChange: row.priceChange,
+    volumeChange: row.volumeChange,
+    reasons: row.reasons ? JSON.parse(row.reasons) : undefined,
     timestamp: row.timestamp,
     createdAt: row.createdAt
   }));
