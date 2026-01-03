@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import cron from 'node-cron';
 import { initDatabase, saveNewsReport } from './database';
 import { updateAllMarkets } from './services/polymarket';
-import { detectAnomalies, shouldGenerateReport } from './services/anomalyDetection';
+import { detectAnomalies, shouldGenerateReport, filterNoisiestMarkets } from './services/anomalyDetection';
 import { generateReport, initializeAI } from './services/aiReport';
 import { getAllMarkets } from './database';
 import apiRoutes from './routes/api';
@@ -45,36 +45,49 @@ async function updateMarketsAndGenerateReports() {
     const updatedMarkets = await updateAllMarkets();
     console.log(`Updated ${updatedMarkets.length} markets`);
     
-    // Check for anomalies and generate reports
-    for (const market of updatedMarkets) {
-      const anomalies = detectAnomalies(market);
-      
-      if (shouldGenerateReport(anomalies)) {
-        try {
-          console.log(`Generating report for market: ${market.question.substring(0, 50)}...`);
-          const report = await generateReport(market, anomalies);
-          
-          const primaryAnomaly = anomalies.find(a => a.severity === 'high') || anomalies[0];
-          
-          await saveNewsReport({
-            marketId: market.marketId,
-            headline: report.headline,
-            summary: report.summary,
-            analysis: report.analysis,
-            keyTakeaways: report.keyTakeaways,
-            confidence: primaryAnomaly.confidence,
-            priceChange: primaryAnomaly.priceChange,
-            volumeChange: primaryAnomaly.volumeChange,
-            timestamp: Date.now()
-          });
-          
-          console.log(`Generated report: ${report.headline}`);
-          
-          // Rate limiting: wait between reports
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        } catch (error) {
-          console.error(`Error generating report for market ${market.marketId}:`, error);
-        }
+    // Filter to only the absolute noisiest markets (top 3 by default)
+    const noisiestMarkets = filterNoisiestMarkets(updatedMarkets, 3);
+    
+    if (noisiestMarkets.length === 0) {
+      console.log('No major spikes detected. Skipping report generation.');
+      return;
+    }
+    
+    console.log(`\n🔔 Found ${noisiestMarkets.length} major spike(s):`);
+    noisiestMarkets.forEach((scored, idx) => {
+      console.log(`  ${idx + 1}. Score: ${scored.score.toFixed(1)} - ${scored.market.question.substring(0, 60)}`);
+      console.log(`     Reasons: ${scored.reasons.join(', ')}`);
+    });
+    
+    // Generate reports only for the noisiest markets
+    for (const scoredMarket of noisiestMarkets) {
+      try {
+        const { market, anomalies, score, reasons } = scoredMarket;
+        console.log(`\n📰 Generating report for: ${market.question.substring(0, 50)}...`);
+        console.log(`   Noise score: ${score.toFixed(1)}, Reasons: ${reasons.join(', ')}`);
+        
+        const report = await generateReport(market, anomalies);
+        
+        const primaryAnomaly = anomalies.find(a => a.severity === 'high') || anomalies[0];
+        
+        await saveNewsReport({
+          marketId: market.marketId,
+          headline: report.headline,
+          summary: report.summary,
+          analysis: report.analysis,
+          keyTakeaways: report.keyTakeaways,
+          confidence: primaryAnomaly.confidence,
+          priceChange: primaryAnomaly.priceChange,
+          volumeChange: primaryAnomaly.volumeChange,
+          timestamp: Date.now()
+        });
+        
+        console.log(`✅ Generated report: ${report.headline}`);
+        
+        // Rate limiting: wait between reports
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`Error generating report for market ${scoredMarket.market.marketId}:`, error);
       }
     }
   } catch (error) {

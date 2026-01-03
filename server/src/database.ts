@@ -247,6 +247,39 @@ export async function getRecentReports(limit: number = 50): Promise<NewsReport[]
   }));
 }
 
+export async function clearAllData() {
+  try {
+    await dbRun('DELETE FROM news_reports');
+    await dbRun('DELETE FROM market_history');
+    await dbRun('DELETE FROM markets');
+    console.log('✅ All data cleared from database');
+  } catch (error) {
+    console.error('Error clearing database:', error);
+    throw error;
+  }
+}
+
+export async function clearNewsReports() {
+  try {
+    await dbRun('DELETE FROM news_reports');
+    console.log('✅ News reports cleared');
+  } catch (error) {
+    console.error('Error clearing news reports:', error);
+    throw error;
+  }
+}
+
+export async function clearMarkets() {
+  try {
+    await dbRun('DELETE FROM market_history');
+    await dbRun('DELETE FROM markets');
+    console.log('✅ Markets and history cleared');
+  } catch (error) {
+    console.error('Error clearing markets:', error);
+    throw error;
+  }
+}
+
 export function closeDatabase() {
   db.close();
 }
