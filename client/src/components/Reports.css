@@ -1,0 +1,48 @@
+.reports {
+  width: 100%;
+}
+
+.reports-header {
+  margin-bottom: 2rem;
+}
+
+.reports-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #111;
+}
+
+.reports-subtitle {
+  font-size: 1rem;
+  color: #666;
+}
+
+.reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.no-reports {
+  text-align: center;
+  padding: 4rem 2rem;
+  background-color: white;
+  border-radius: 8px;
+  color: #666;
+}
+
+.no-reports p {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .reports-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .reports-list {
+    gap: 1.5rem;
+  }
+}
+

@@ -1,0 +1,12 @@
+.price-chart {
+  width: 100%;
+}
+
+.chart-loading,
+.chart-empty {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
